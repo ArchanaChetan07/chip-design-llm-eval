@@ -1,0 +1,13 @@
+{
+  "_snapshot_date": "PLACEHOLDER-replace-with-real-date-at-benchmark-time",
+  "_source_urls": {
+    "cloud_a": "PLACEHOLDER-provider-pricing-page-url",
+    "cloud_b": "PLACEHOLDER-provider-pricing-page-url"
+  },
+  "cloud_a": {"prompt_per_1k": 0.003, "completion_per_1k": 0.015},
+  "cloud_b": {"prompt_per_1k": 0.0025, "completion_per_1k": 0.010},
+  "onprem": {
+    "fp16": {"gpu_hour_rate": 0.50, "note": "PLACEHOLDER - real rental $/hr for 3090/4090/A5000"},
+    "int8": {"gpu_hour_rate": 0.50, "note": "same GPU as fp16 run, PagedKV-Fusion INT8 config"}
+  }
+}

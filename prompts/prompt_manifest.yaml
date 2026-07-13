@@ -1,0 +1,69 @@
+prompts:
+  - id: uart_tx_basic
+    category: peripherals
+    prompt: >
+      Write a synthesizable SystemVerilog module named uart_tx with inputs
+      clk, rst_n (active-low), tx_start, and an 8-bit data input. Outputs are
+      tx (serial line, idle high) and busy. On tx_start, transmit data as
+      8N1 (1 start bit low, 8 data bits LSB first, 1 stop bit high), then
+      return to idle. Assume tx_start is already synchronized to one clock
+      per bit period (no baud generator required).
+    testbench_path: testbenches/peripherals/uart_tx_tb.sv
+    difficulty: moderate
+
+  - id: adder_param
+    category: arithmetic
+    prompt: >
+      Write a synthesizable SystemVerilog module named adder with a
+      parameter WIDTH (default 8). Inputs a and b are WIDTH-bit unsigned.
+      Output sum is WIDTH+1 bits (to capture carry-out) and equals a+b
+      exactly, including overflow.
+    testbench_path: testbenches/arithmetic/adder_tb.sv
+    difficulty: trivial
+
+  - id: traffic_fsm_basic
+    category: fsm
+    prompt: >
+      Write a synthesizable SystemVerilog module named traffic_fsm with
+      parameters GREEN_CYCLES (default 4), YELLOW_CYCLES (default 2), and
+      RED_CYCLES (default 3), all in clock cycles. Inputs are clk and
+      active-low rst_n. Outputs are three one-hot signals: red, yellow,
+      green -- exactly one must be high at all times after reset. The
+      sequence must be RED -> GREEN -> YELLOW -> RED, repeating, holding
+      each state for its configured number of cycles. On reset, start in RED.
+    testbench_path: testbenches/fsm/traffic_fsm_tb.sv
+    difficulty: moderate
+
+  - id: sync_fifo_basic
+    category: interface_adapters
+    prompt: >
+      Write a synthesizable SystemVerilog module named sync_fifo with
+      parameters WIDTH (default 8) and DEPTH (default 4, power of 2).
+      Inputs: clk, active-low rst_n, wr_en, rd_en, wr_data. Outputs:
+      rd_data, full, empty. Standard synchronous FIFO semantics: writes are
+      ignored when full, reads are ignored when empty, full and empty must
+      be correctly asserted (using a pointer-width trick or count register,
+      your choice) so that exactly DEPTH writes without a read causes full
+      to assert, and a subsequent write while full does NOT corrupt any
+      buffered data.
+    testbench_path: testbenches/interface_adapters/sync_fifo_tb.sv
+    difficulty: moderate
+
+  - id: sat_counter_basic
+    category: arithmetic
+    prompt: >
+      Write a synthesizable SystemVerilog module named sat_counter with
+      parameter WIDTH (default 4). Inputs: clk, active-low rst_n, up, down
+      (single-cycle pulses). Output: count (WIDTH bits, unsigned). On an up
+      pulse, increment count unless it is already at its maximum value
+      (2^WIDTH - 1), in which case hold. On a down pulse, decrement count
+      unless it is already 0, in which case hold. If up and down are
+      asserted simultaneously, hold (no change). The counter must never
+      wrap around at either boundary.
+    testbench_path: testbenches/arithmetic/sat_counter_tb.sv
+    difficulty: trivial
+
+  # Additional prompts to be added during further pilot expansion:
+  # fsm/handshake_protocol, peripherals/spi_slave,
+  # arithmetic/param_multiplier, interface_adapters/axi_lite_regs,
+  # interface_adapters/cdc_sync

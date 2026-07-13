@@ -1,0 +1,34 @@
+{
+  "_note": "Minimal starter dashboard. Import into Grafana, point the Prometheus data source at your scrape target (mock server for dev, real vLLM for execution -- same metric names either way).",
+  "title": "Chip-Design LLM Benchmark",
+  "panels": [
+    {
+      "title": "TTFT (avg, by config)",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "vllm_time_to_first_token_seconds_sum / vllm_time_to_first_token_seconds_count"}
+      ]
+    },
+    {
+      "title": "E2E Latency (avg, by config)",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "vllm_e2e_request_latency_seconds_sum / vllm_e2e_request_latency_seconds_count"}
+      ]
+    },
+    {
+      "title": "Requests Total",
+      "type": "stat",
+      "targets": [
+        {"expr": "vllm_request_success_total"}
+      ]
+    },
+    {
+      "title": "Generation Tokens Total",
+      "type": "stat",
+      "targets": [
+        {"expr": "vllm_generation_tokens_total"}
+      ]
+    }
+  ]
+}
