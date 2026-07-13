@@ -6,7 +6,32 @@
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](#tech-stack)
 [![SystemVerilog](https://img.shields.io/badge/RTL-SystemVerilog-3F51B5)](#benchmark-coverage)
 [![Simulators](https://img.shields.io/badge/Sim-Icarus%20%7C%20Verilator-00695C)](#correctness-harness)
-[![License](https://img.shields.io/badge/License-See%20repo-lightgrey)](https://github.com/ArchanaChetan07/chip-design-llm-eval)
+[![Trials](https://img.shields.io/badge/Pilot-30%20trials-0B7285)](#results-in-numbers)
+[![Speedup](https://img.shields.io/badge/INT8%20E2EL-1.97×%20faster-2B8A3E)](#results-in-numbers)
+
+---
+
+## Results in numbers
+
+| Metric | Value |
+|---|---:|
+| Prompt categories covered | **4** (arithmetic, peripherals, FSM, interfaces) |
+| Pilot prompts | **5** |
+| Serving configs compared | **2** (fp16, INT8) |
+| Trials per prompt × config | **3** |
+| Total trials in latest matrix | **30** (`5 × 2 × 3`) |
+| Dual-simulator harness pairs validated | **5 / 5** (100%) |
+| Unit tests passing | **7 / 7** (100%) |
+| fp16 trials passed | **3 / 15** (20%) |
+| INT8 trials passed | **3 / 15** (20%) |
+| fp16 TTFT p50 | **0.167 s** |
+| INT8 TTFT p50 | **0.103 s** |
+| fp16 E2EL p50 | **2.098 s** |
+| INT8 E2EL p50 | **1.067 s** |
+| INT8 vs fp16 TTFT speedup | **1.63×** |
+| INT8 vs fp16 E2EL speedup | **1.97×** |
+| Paired pass→fail flips (fp16 ↔ INT8) | **0** |
+| Failure category (both configs) | **12** syntax_error per config |
 
 ---
 
@@ -165,8 +190,8 @@ Failure taxonomy includes compile errors, simulation mismatches, timeouts, harne
 
 ## Pilot results (latest local matrix)
 
-Latest orchestrated run: **5 prompts · 2 configs · 3 trials = 30 trials**  
-Artifacts: `results/raw/raw_results_171b5117.json` → `results/processed/summary.json`
+Source run: `results/raw/raw_results_171b5117.json` → `results/processed/summary.json`  
+Matrix size: **5 prompts × 2 configs × 3 trials = 30 trials**
 
 ### Latency — fp16 vs INT8
 
