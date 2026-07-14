@@ -1,183 +1,146 @@
-# Chip-Design LLM Eval
+![CI](https://github.com/ArchanaChetan07/chip-design-llm-eval/actions/workflows/ci.yml/badge.svg)
 
-### Hardware-in-the-loop evaluation of LLMs for RTL/SystemVerilog generation with dual-simulator correctness, latency, and cost.
+Hardware-in-the-loop LLM evaluation for RTL/SystemVerilog generation - dual-simulator (Icarus + Verilator) correctness checking, Flask mock serving, Docker-reproducible.
 
-[![GitHub](https://img.shields.io/badge/repo-chip-design-llm-eval-181717?logo=github)](https://github.com/ArchanaChetan07/chip-design-llm-eval)
-[![Language](https://img.shields.io/badge/language-Python-3572A5)](https://github.com/ArchanaChetan07/chip-design-llm-eval)
-[![License](https://img.shields.io/badge/license-See%20repository-yellow)](https://github.com/ArchanaChetan07/chip-design-llm-eval)
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/ArchanaChetan07/chip-design-llm-eval/actions)
+**5/5** dual-simulator harness pairs validated (**100%**) - **30-trial pilot** (5 prompts x 2 configs x 3 trials) - **7/7** tests passing - one-command Docker reproducible (no host EDA install).
+
+How to run: `docker compose run --rm harness` (builds an image with `iverilog` + `verilator`, validates the harness, runs pytest).
 
 ---
 
 ## Overview
 
-LLM-assisted chip design claims are hard to trust when 'it compiled once' is treated as success; teams need reproducible correctness, latency, and cost comparisons across serving configs.
+LLM-assisted RTL claims are hard to trust when "it compiled once" is treated as success. This repo is a **hardware-in-the-loop eval harness**: prompts go to a vLLM-compatible API (mock or real), generated SystemVerilog is checked for correctness against golden testbenches under **both Icarus Verilog and Verilator**, and latency / cost are recorded for serving configs.
 
-Prompt matrix x serving configs x trials against a vLLM-compatible API (mock or real), dual Icarus+Verilator golden testbenches, paired fp16/INT8 comparison, token/GPU cost model, Prometheus metrics and Grafana.
-
-Pilot matrix of 30 trials with instrumented reporting; harness and unit tests green; INT8 shows ~2x E2EL vs fp16 on the mock path with no pass-to-fail flips (pipeline validation, not production GPU claims).
-
-This repository is maintained as **production-minded portfolio work**: clear architecture, automated checks where present, and metrics that are **traceable to committed artifacts** (never invented).
+Stack: Python, Flask (mock vLLM), pytest, Icarus, Verilator, Prometheus-style metrics on the mock server.
 
 ---
 
-## Architecture
+## Why This Matters
 
-Prompt manifest and serving configs feed a request runner that calls a vLLM-compatible completions API, then dual simulators and cost/metrics collectors produce paired reports and Grafana dashboards.
-
-```mermaid
-flowchart LR
-  P[Prompt Manifest] --> R[Request Runner]
-  C[Serving Configs fp16/INT8/cloud] --> R
-  R --> V[vLLM-compatible API]
-  V --> S[Icarus + Verilator]
-  V --> M[Prometheus /metrics]
-  S --> A[Paired Comparison + Cost Model]
-  M --> A
-  A --> G[VALIDATION_REPORT + Grafana]
-```
-
-```mermaid
-sequenceDiagram
-  participant U as User/Client
-  participant S as Service/Pipeline
-  participant E as Eval/Tools
-  U->>S: request / job
-  S->>E: execute
-  E-->>S: results
-  S-->>U: report / response
-```
+A single open-source simulator can have quirks that let incorrect RTL slip through. Requiring **agreement from two independent simulators** (Icarus + Verilator) on the same self-checking testbench raises the bar: syntax-only "compiles" is not enough, and simulator-specific blind spots are harder to hide. The harness itself is proven first on hand-written known-good / known-broken pairs before any LLM output is scored.
 
 ---
 
-## Results & repository facts
+## Method
 
-> Only values found in code, configs, tests, or generated reports are listed. Absence of a clinical/ML accuracy number means it was **not** published in-repo.
+### What the "2 configs" are
 
-| Metric | Value | Source |
-|---|---|---|
-| Pilot trials | **30 (5 prompts x 2 configs x 3 trials)** | `README.md` |
-| Dual-simulator harness pairs validated | **5/5 (100%)** | `README.md` |
-| Unit tests passing | **7/7 (100%)** | `README.md` |
-| fp16 pass rate | **3/15 (20%)** | `VALIDATION_REPORT.md` |
-| INT8 pass rate | **3/15 (20%)** | `VALIDATION_REPORT.md` |
-| fp16 TTFT p50 | **0.167 s** | `VALIDATION_REPORT.md` |
-| INT8 TTFT p50 | **0.103 s** | `VALIDATION_REPORT.md` |
-| fp16 E2EL p50 | **2.098 s** | `VALIDATION_REPORT.md` |
-| INT8 E2EL p50 | **1.067 s** | `VALIDATION_REPORT.md` |
-| INT8 vs fp16 E2EL speedup | **1.97x** | `README.md` |
-| Paired pass-to-fail flips | **0** | `VALIDATION_REPORT.md` |
-| Tracked files | **47** | `git tree` |
-| Python modules | **15** | `git tree` |
-| Test-related paths | **1** | `git tree` |
-| CI workflows | **Yes** | `.github/workflows` |
-| Docker present | **No** | `repo root` |
+The pilot compares two **on-prem serving profiles** (not two different foundation models):
 
-```mermaid
-xychart-beta
-    title "Reported percentage metrics (from repo artifacts)"
-    x-axis ["Dual-simulator harness pairs", "Unit tests passing", "fp16 pass rate", "INT8 pass rate"]
-    y-axis "Percent" 0 --> 105
-    bar [100.0, 100.0, 20.0, 20.0]
-```
+| Config | Role |
+|--------|------|
+| **fp16** | Mock vLLM on port 8000 with higher artificial TTFT / E2EL (proxy for full-precision / slower serving) |
+| **int8** | Mock vLLM on port 8001 with lower artificial latency (proxy for INT8 / faster serving) |
 
-```mermaid
-%%{init: {'theme':'base'}}%%
-pie showData title Language composition (bytes)
-    "Python" : 64
-    "SystemVerilog" : 32
-    "Shell" : 4
-```
+Both profiles currently return the same canned UART RTL for pipeline validation. Real GPU quantization swaps plug into the same `serving/configs*.json` + request runner without changing the dual-sim evaluator.
+
+### Pilot matrix
+
+- **5 prompts**: `uart_tx_basic`, `adder_param`, `traffic_fsm_basic`, `sync_fifo_basic`, `sat_counter_basic`
+- **2 configs**: fp16, int8
+- **3 trials** per prompt x config
+- **Total: 30 trials** (honest pilot study - not a 40-60 prompt full benchmark)
+
+Correctness = compile + sim under Icarus **and** Verilator against the paired `*_tb.sv`.
 
 ---
 
-## Key features
+## Results
 
-- Dual-simulator correctness harness (Icarus + Verilator) against golden testbenches
-- Configurable trial matrix over prompts x serving profiles (fp16/INT8/cloud)
-- TTFT and end-to-end latency percentiles with paired flip analysis
-- Token- and GPU-hour cost modeling with dated pricing snapshots
-- Mock vLLM server for local pipeline validation without GPUs
-- Auto-generated VALIDATION_REPORT from processed results JSON
+### Dual-simulator harness trust (re-verified in Docker this session)
 
----
+| Pair | known-good | known-broken |
+|------|:----------:|:------------:|
+| uart_tx | pass | fail (mismatch) |
+| traffic_fsm | pass | fail (mismatch) |
+| sat_counter | pass | fail (mismatch) |
+| adder | pass | fail (mismatch) |
+| sync_fifo | pass | fail (mismatch) |
 
-## Tech stack
+**5/5 pairs OK** - harness is trustworthy before LLM scoring.
 
-| Layer | Technology |
-|---|---|
-| Language | Python |
-| Language | SystemVerilog |
-| Framework | Flask |
-| Framework | pytest |
-| Tool | Icarus Verilog |
-| Tool | Verilator |
-| API | vLLM-compatible OpenAI HTTP |
-| API | Anthropic |
-| Tool | Prometheus |
-| Tool | Grafana |
+### Unit tests
 
----
+**7/7** passed inside the Docker image (`pytest -q`).
 
-## Skills demonstrated
+### Pilot study (n=30 trials, 5 prompts) - mock serving, not production GPU
 
-Python · Flask · pytest · Icarus Verilog · Verilator · Prometheus · Grafana · CI/CD · testing · automation
+From committed `results/processed/summary.json` / `VALIDATION_REPORT.md`:
 
-Keyword surface: **Python · Python · machine-learning · CI/CD · testing · API · Docker · automation · data-science · software-engineering · system-design · observability · LLM · cloud**
+| Config | Passed | Total | Pass rate | TTFT p50 | E2EL p50 |
+|--------|-------:|------:|----------:|---------:|---------:|
+| fp16 | 3 | 15 | **20%** | 0.167 s | 2.098 s |
+| int8 | 3 | 15 | **20%** | 0.103 s | 1.067 s |
 
----
+- INT8 E2EL ~**1.97x** faster than fp16 on the mock path (pipeline timing exercise).
+- **0** paired pass-to-fail flips between fp16 and int8 on matched trials.
+- Most failures are `syntax_error`: the mock returns canned **uart_tx** RTL for every prompt, so non-UART benches correctly fail. That is expected for mock pipeline validation, not a claim of live-LLM accuracy.
 
-## Project structure
-
-```text
-chip-design-llm-eval/
-├── harness/          # request_runner, metrics, cost_model
-├── serving/          # mock_vllm_server, cloud_clients
-├── eval/             # sim_runner, paired_comparison
-├── testbenches/ prompts/ results/
-├── scripts/ dashboards/
-└── .github/workflows/ci.yml
-```
+No additional LLM API trials were run in this session - the **30-trial pilot** number is not inflated.
 
 ---
 
-## Installation & usage
+## How to Run
+
+### Docker-first (recommended)
 
 ```bash
 git clone https://github.com/ArchanaChetan07/chip-design-llm-eval.git
 cd chip-design-llm-eval
-python -m venv .venv && source .venv/bin/activate
+
+# Build image with apt-installed iverilog + verilator, then validate + pytest
+docker compose run --rm harness
+```
+
+Optional mock serving (fp16 + int8 Flask apps):
+
+```bash
+docker compose up mock-fp16 mock-int8
+# POST http://localhost:8000/v1/completions  (fp16 profile)
+# POST http://localhost:8001/v1/completions  (int8 profile)
+# GET  http://localhost:8000/metrics
+```
+
+No host install of Icarus or Verilator is required.
+
+### Local (if you already have the tools)
+
+```bash
+sudo apt-get install -y iverilog verilator   # Debian/Ubuntu
 pip install -r requirements.txt
+python scripts/validate_testbenches.py
 pytest -q
-python serving/mock_vllm_server.py
-python scripts/generate_report.py
 ```
 
 ---
 
-## How it works
+## Tests
 
-The suite loads prompts from a manifest and fans trials across serving configurations via harness/request_runner.py against either the local mock OpenAI-compatible server or real endpoints. Generated SystemVerilog is checked by eval/sim_runner.py under both Icarus and Verilator against golden testbenches; harness/metrics_collector.py records TTFT/E2EL while cost_model.py attributes token and GPU-hour cost. eval/paired_comparison.py detects configuration regressions; scripts/generate_report.py emits VALIDATION_REPORT.md from results/processed/summary.json.
+```bash
+docker compose run --rm harness
+# or: pytest -q && python scripts/validate_testbenches.py
+```
 
-CI installs simulator tooling and runs unit tests. The published pilot numbers used the mock serving layer, so they validate the measurement pipeline rather than a specific GPU model.
+CI (`.github/workflows/ci.yml`) runs:
+1. apt install of Icarus/Verilator + harness validate + pytest
+2. **Docker image build** + same tests inside the container
+3. mock fp16/int8 smoke matrix
 
 ---
 
-## Future improvements
+## Tech Stack
 
-- Expand prompt suite toward the 40-60 target with real vLLM/PagedKV endpoints
-- Fill hardware/model placeholders in VALIDATION_REPORT for production GPU runs
-- Add more cloud provider clients beyond Anthropic
+| Layer | Technology |
+|-------|------------|
+| Eval | Icarus Verilog + Verilator (dual-sim) |
+| API | Flask mock vLLM / real OpenAI-compatible or Anthropic clients |
+| Orchestration | prompt manifest YAML, request runner, paired comparison, cost model |
+| Observability | Prometheus text on mock `/metrics`, Grafana JSON |
+| Quality | pytest, GitHub Actions, Docker Compose |
 
 ---
 
 ## License
 
-See repository.
-
----
-
-<p align="center">
-  <b>Chip-Design LLM Eval</b><br/>
-  <a href="https://github.com/ArchanaChetan07/chip-design-llm-eval">github.com/ArchanaChetan07/chip-design-llm-eval</a>
-</p>
+See repository license / owner terms for this project.
