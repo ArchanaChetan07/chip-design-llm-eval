@@ -1,0 +1,28 @@
+# One-command dual-sim harness (no host Icarus/Verilator install).
+#   docker compose run --rm harness
+# Optional mock vLLM serving (fp16 vs int8 latency profiles):
+#   docker compose up mock-fp16 mock-int8
+
+services:
+  harness:
+    build: .
+    image: chip-design-llm-eval:local
+    working_dir: /app
+    # Validate 5/5 known-good/broken pairs under Icarus+Verilator, then pytest
+    command: ["sh", "-c", "python scripts/validate_testbenches.py && pytest -q"]
+
+  mock-fp16:
+    image: chip-design-llm-eval:local
+    build: .
+    working_dir: /app
+    command: ["python", "serving/mock_vllm_server.py", "--port", "8000", "--profile", "fp16"]
+    ports:
+      - "8000:8000"
+
+  mock-int8:
+    image: chip-design-llm-eval:local
+    build: .
+    working_dir: /app
+    command: ["python", "serving/mock_vllm_server.py", "--port", "8001", "--profile", "int8"]
+    ports:
+      - "8001:8001"
